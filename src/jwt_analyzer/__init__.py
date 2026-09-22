@@ -1,6 +1,11 @@
 """JWT Security Analyzer core package."""
 
-from jwt_analyzer.analyzers import HeaderAnalysisConfig, HeaderAnalyzer
+from jwt_analyzer.analyzers import (
+    HeaderAnalysisConfig,
+    HeaderAnalyzer,
+    PayloadAnalysisConfig,
+    PayloadAnalyzer,
+)
 from jwt_analyzer.exceptions import JWTParseError
 from jwt_analyzer.findings import Confidence, Finding, Severity
 from jwt_analyzer.parser import JWTMetadata, JWTParser, ParsedJWT, parse_jwt
@@ -14,6 +19,8 @@ __all__ = [
     "JWTMetadata",
     "JWTParser",
     "ParsedJWT",
+    "PayloadAnalysisConfig",
+    "PayloadAnalyzer",
     "Severity",
     "parse_jwt",
 ]
