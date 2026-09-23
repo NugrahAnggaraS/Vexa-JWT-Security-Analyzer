@@ -11,7 +11,7 @@ import pytest
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
-from jwt_analyzer.cli import run
+from jwt_analyzer.cli import _read_token, run
 from jwt_analyzer.config import (
     Settings,
     configure,
@@ -296,6 +296,24 @@ class TestCliConfig:
         assert page.startswith("<!DOCTYPE html>")
         assert "<script" not in page
         assert "Executive Summary" in page
+
+    def test_unstatable_token_string_stays_a_jwt(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        def explode(self: object) -> bool:
+            del self
+            raise OSError(36, "File name too long")
+
+        monkeypatch.setattr("jwt_analyzer.cli.Path.is_file", explode)
+        sample = "header.payload.signature"
+        assert _read_token(sample) == sample
+
+    def test_long_compact_token_is_not_read_as_a_path(self, capsys: pytest.CaptureFixture[str]) -> None:
+        sample = token({"alg": "RS256", "typ": "JWT", "kid": "k" * 180}, claims())
+        assert len(sample) > 255
+        code = run(["analyze", sample, "--format", "json"])
+        captured = capsys.readouterr()
+        assert code == 0
+        assert "File name too long" not in captured.err
+        assert json.loads(captured.out)["schema_version"] == 1
 
     def test_public_key_verification(self, tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
         private = rsa.generate_private_key(public_exponent=65537, key_size=2048)

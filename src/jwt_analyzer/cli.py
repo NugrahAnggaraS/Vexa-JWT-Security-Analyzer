@@ -571,7 +571,11 @@ def _cmd_batch(
 
 def _token_label(value: str, index: int) -> str:
     path = Path(value)
-    if path.is_file():
+    try:
+        is_file = path.is_file()
+    except OSError:
+        is_file = False
+    if is_file:
         return path.name
     return f"token{index + 1}"
 
@@ -585,10 +589,16 @@ def _use_color(out: TextIO, force_color: bool, disable_color: bool) -> bool:
 
 
 def _read_token(value: str) -> str:
-    path = Path(value)
-    if path.is_file():
+    text = value.strip()
+    path = Path(text)
+    try:
+        is_file = path.is_file()
+    except OSError:
+        # A compact JWT can be longer than the OS file-name limit.
+        return text
+    if is_file:
         return path.read_text(encoding="utf-8").strip()
-    return value.strip()
+    return text
 
 
 def _status(findings: Sequence[Finding], *, failed: bool) -> int:
