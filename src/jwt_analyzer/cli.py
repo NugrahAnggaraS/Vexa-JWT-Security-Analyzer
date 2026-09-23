@@ -1,9 +1,10 @@
-"""Command-line facade for JWKS and OIDC analysis.
+"""Command-line facade for JWKS, OIDC, comparison, and batch analysis.
 
 ``jwt-analyzer jwks`` prints key metadata and suspicious-key findings.
 ``jwt-analyzer oidc`` prints OpenID Provider metadata and advertised
 signing algorithms. ``jwt-analyzer verify --jwks-url`` selects the key
-by ``kid`` and checks the signature without a separate public-key file.
+by ``kid``. ``jwt-analyzer compare`` diffs tokens. ``jwt-analyzer batch``
+analyzes a file or directory and prints an aggregate report.
 """
 
 from __future__ import annotations
@@ -13,6 +14,8 @@ import sys
 from pathlib import Path
 from typing import Optional, Sequence, TextIO
 
+from jwt_analyzer.analyzers.batch import analyze_batch, format_batch_report, format_progress, load_token_source
+from jwt_analyzer.analyzers.compare import compare_tokens, format_comparison
 from jwt_analyzer.analyzers.jwks import format_jwks_analysis, load_jwks, match_token
 from jwt_analyzer.analyzers.oidc import (
     OidcAnalysisConfig,
@@ -21,7 +24,14 @@ from jwt_analyzer.analyzers.oidc import (
     format_oidc_token,
     load_oidc_provider,
 )
-from jwt_analyzer.exceptions import JWTParseError, JwksError, OidcError, RemoteFetchError
+from jwt_analyzer.exceptions import (
+    BatchError,
+    CompareError,
+    JWTParseError,
+    JwksError,
+    OidcError,
+    RemoteFetchError,
+)
 from jwt_analyzer.findings import Finding, Severity
 from jwt_analyzer.parser import parse_jwt
 
@@ -30,7 +40,7 @@ def build_parser() -> argparse.ArgumentParser:
     """Return the parser for the JWKS and OIDC commands."""
     parser = argparse.ArgumentParser(
         prog="jwt-analyzer",
-        description="Analyze a JSON Web Key Set, an OpenID Provider, or a token signature.",
+        description="Analyze JWTs, a JSON Web Key Set, or an OpenID Provider.",
     )
     commands = parser.add_subparsers(dest="command", required=True)
 
@@ -46,6 +56,16 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("token", help="Compact JWT or a file that contains one")
     verify.add_argument("--jwks-url", help="JWKS URL. The key is selected by kid")
     verify.add_argument("--jwks-file", help="Local JWKS file. The key is selected by kid")
+
+    compare = commands.add_parser("compare", help="Diff two or more JWTs and flag privilege changes")
+    compare.add_argument("tokens", nargs="+", help="Compact JWTs or files that contain one each")
+    compare.add_argument("--color", action="store_true", help="Color changed values even when stdout is not a terminal")
+    compare.add_argument("--no-color", action="store_true", help="Do not color the diff")
+
+    batch = commands.add_parser("batch", help="Analyze a directory or a file of JWTs")
+    batch.add_argument("path", nargs="?", help="Directory of token files, or a file with one JWT per line")
+    batch.add_argument("--file", help="Text file with one JWT per line")
+    batch.add_argument("--workers", type=int, default=4, help="How many tokens to analyze at once")
     return parser
 
 
@@ -77,7 +97,11 @@ def run(
             return _cmd_oidc(args.issuer, args.token, out)
         if args.command == "verify":
             return _cmd_verify(args.token, args.jwks_url, args.jwks_file, out, err)
-    except (JwksError, OidcError, RemoteFetchError, JWTParseError, OSError) as exc:
+        if args.command == "compare":
+            return _cmd_compare(args.tokens, args.color, args.no_color, out, err)
+        if args.command == "batch":
+            return _cmd_batch(args.path, args.file, args.workers, out, err)
+    except (JwksError, OidcError, RemoteFetchError, JWTParseError, CompareError, BatchError, OSError) as exc:
         print(str(exc), file=err)
         return 2
     print(f"Unknown command: {args.command}", file=err)
@@ -130,6 +154,63 @@ def _cmd_verify(
     print(format_jwks_analysis(document, match), file=out)
     failed = match.signature_valid is not True
     return _status(list(document.all_findings) + list(match.findings), failed=failed)
+
+
+def _cmd_compare(
+    tokens: Sequence[str],
+    force_color: bool,
+    disable_color: bool,
+    out: TextIO,
+    err: TextIO,
+) -> int:
+    if force_color and disable_color:
+        print("Pass only one of --color or --no-color.", file=err)
+        return 2
+    parsed = [parse_jwt(_read_token(value)) for value in tokens]
+    labels = [_token_label(value, index) for index, value in enumerate(tokens)]
+    report = compare_tokens(parsed, labels)
+    print(format_comparison(report, color=_use_color(out, force_color, disable_color)), file=out)
+    return _status(report.findings, failed=False)
+
+
+def _cmd_batch(
+    path: Optional[str],
+    file_path: Optional[str],
+    workers: int,
+    out: TextIO,
+    err: TextIO,
+) -> int:
+    if bool(path) == bool(file_path):
+        message = "Pass a path or --file, not both." if path and file_path else "Pass a directory, a token file, or --file."
+        print(message, file=err)
+        return 2
+
+    def on_progress(done: int, total: int) -> None:
+        if not getattr(err, "isatty", lambda: False)():
+            return
+        print("\r" + format_progress(done, total), end="", file=err, flush=True)
+        if done == total:
+            print(file=err)
+
+    report = analyze_batch(load_token_source(file_path or path or ""), max_workers=workers, on_progress=on_progress)
+    print(format_batch_report(report), file=out)
+    failed = any(item.status in {"critical", "invalid"} for item in report.items)
+    return _status(report.findings, failed=failed)
+
+
+def _token_label(value: str, index: int) -> str:
+    path = Path(value)
+    if path.is_file():
+        return path.name
+    return f"token{index + 1}"
+
+
+def _use_color(out: TextIO, force_color: bool, disable_color: bool) -> bool:
+    if disable_color:
+        return False
+    if force_color:
+        return True
+    return bool(getattr(out, "isatty", lambda: False)())
 
 
 def _read_token(value: str) -> str:

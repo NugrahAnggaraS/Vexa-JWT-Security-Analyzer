@@ -25,6 +25,30 @@ class JwksError(ValueError):
         return self.message
 
 
+class CompareError(ValueError):
+    """Raised when two tokens cannot be compared."""
+
+    def __init__(self, message: str, *, code: str = "INVALID_COMPARE") -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+    def __str__(self) -> str:
+        return self.message
+
+
+class BatchError(ValueError):
+    """Raised when a batch of tokens cannot be loaded."""
+
+    def __init__(self, message: str, *, code: str = "INVALID_BATCH") -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+    def __str__(self) -> str:
+        return self.message
+
+
 class OidcError(ValueError):
     """Raised when OpenID Provider metadata cannot be loaded."""
 
