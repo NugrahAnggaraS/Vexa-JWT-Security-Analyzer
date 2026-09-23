@@ -49,6 +49,18 @@ class BatchError(ValueError):
         return self.message
 
 
+class ReporterError(ValueError):
+    """Raised when a report format is unknown or cannot be written."""
+
+    def __init__(self, message: str, *, code: str = "INVALID_FORMAT") -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+    def __str__(self) -> str:
+        return self.message
+
+
 class OidcError(ValueError):
     """Raised when OpenID Provider metadata cannot be loaded."""
 
