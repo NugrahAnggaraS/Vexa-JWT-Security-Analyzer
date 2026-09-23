@@ -1,4 +1,4 @@
-[vexa](./images/vexa.png)
+![vexa](./images/vexa.png)
 # Vexa
 
 **Vexa** is a command-line JWT security analyzer for authorized security assessment, penetration testing, and application security testing.
