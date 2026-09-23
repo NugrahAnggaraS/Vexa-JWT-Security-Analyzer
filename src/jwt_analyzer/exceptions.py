@@ -49,6 +49,18 @@ class BatchError(ValueError):
         return self.message
 
 
+class ConfigError(Exception):
+    """Raised when a configuration file or setting cannot be used."""
+
+    def __init__(self, message: str, *, code: str = "INVALID_CONFIG") -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+    def __str__(self) -> str:
+        return self.message
+
+
 class ReporterError(ValueError):
     """Raised when a report format is unknown or cannot be written."""
 

@@ -22,8 +22,9 @@ findings; it does not replace a manual assessment.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field, replace
-from typing import Mapping, Optional, Sequence
+from typing import Any, Mapping, Optional, Sequence
 
 from jwt_analyzer.analyzers.base import BaseAnalyzer
 from jwt_analyzer.analyzers.crypto import CryptoAnalysisConfig, CryptoAnalyzer
@@ -31,8 +32,11 @@ from jwt_analyzer.analyzers.header import HeaderAnalysisConfig, HeaderAnalyzer
 from jwt_analyzer.analyzers.jwks import JwksAnalysisConfig, JwksAnalyzer
 from jwt_analyzer.analyzers.oidc import OidcAnalysisConfig, OidcTokenAnalyzer
 from jwt_analyzer.analyzers.payload import PayloadAnalysisConfig, PayloadAnalyzer
+from jwt_analyzer.exceptions import ReporterError
 from jwt_analyzer.findings import Confidence, Finding, Severity
-from jwt_analyzer.parser import ParsedJWT, parse_jwt
+from jwt_analyzer.parser import JWTMetadata, ParsedJWT, parse_jwt
+
+logger = logging.getLogger("jwt_analyzer.engine")
 
 SCHEMA_VERSION = 1
 DISCLAIMER = (
@@ -156,6 +160,7 @@ class AnalysisConfig:
     now: Optional[float] = None
     severity_rules: Optional[tuple[SeverityRule, ...]] = None
     scoring: ScoringConfig = field(default_factory=ScoringConfig)
+    ignore: frozenset[str] = field(default_factory=frozenset)
 
 
 @dataclass(frozen=True)
@@ -191,16 +196,24 @@ class AnalyzerEngine:
         parsed = parse_jwt(token)
         findings: list[Finding] = []
         for analyzer in self._analyzers():
-            findings.extend(analyzer.analyze(parsed))
+            produced = analyzer.analyze(parsed)
+            logger.debug("%s produced %d finding(s)", analyzer.name, len(produced))
+            findings.extend(produced)
         rules = self.config.severity_rules
         if rules is None:
             rules = documented_severity_rules()
         normalized = apply_severity_rules(findings, rules)
-        return AnalysisResult(
+        ignored = {item.strip().upper() for item in self.config.ignore if item and item.strip()}
+        if ignored:
+            normalized = tuple(item for item in normalized if item.id.upper() not in ignored)
+            logger.info("suppressed finding ids: %s", ", ".join(sorted(ignored)))
+        result = AnalysisResult(
             token=parsed,
             findings=normalized,
             risk=risk_score(normalized, self.config.scoring),
         )
+        logger.info("analysis finished: findings=%d risk=%d/%d", result.risk.total, result.risk.score, result.risk.maximum)
+        return result
 
     def render(self, result: AnalysisResult, fmt: str, *, color: bool = False) -> str:
         """Format ``result`` with the reporter selected by ``fmt``."""
@@ -221,6 +234,82 @@ class AnalyzerEngine:
             JwksAnalyzer(self.config.jwks),
             OidcTokenAnalyzer(self.config.oidc),
         )
+
+
+def analysis_result_from_dict(data: Mapping[str, Any]) -> AnalysisResult:
+    """Rebuild an analysis result from a JSON report document."""
+    if not isinstance(data, Mapping):
+        raise ReporterError("Report must be a JSON object", code="INVALID_REPORT")
+    token_doc = data.get("token")
+    findings_doc = data.get("findings")
+    if not isinstance(token_doc, Mapping) or not isinstance(findings_doc, list):
+        raise ReporterError("Report is missing token or findings", code="INVALID_REPORT")
+    metadata_doc = token_doc.get("metadata")
+    signature_doc = token_doc.get("signature")
+    header = token_doc.get("header")
+    payload = token_doc.get("payload")
+    if not isinstance(metadata_doc, Mapping) or not isinstance(header, dict) or not isinstance(payload, dict):
+        raise ReporterError("Report token is incomplete", code="INVALID_REPORT")
+    if not isinstance(signature_doc, Mapping):
+        signature_doc = {}
+    findings: list[Finding] = []
+    for item in findings_doc:
+        if not isinstance(item, Mapping):
+            raise ReporterError("Report findings must be objects", code="INVALID_REPORT")
+        try:
+            findings.append(
+                Finding(
+                    id=str(item["id"]),
+                    title=str(item["title"]),
+                    severity=Severity(str(item["severity"])),
+                    confidence=Confidence(str(item["confidence"])),
+                    description=str(item.get("description", "")),
+                    evidence=str(item.get("evidence", "")),
+                    impact=str(item.get("impact", "")),
+                    remediation=str(item.get("remediation", "")),
+                    references=tuple(str(ref) for ref in item.get("references") or ()),
+                )
+            )
+        except (KeyError, ValueError) as exc:
+            raise ReporterError(f"Report finding is invalid: {exc}", code="INVALID_REPORT") from exc
+    custom = token_doc.get("custom_claims")
+    parsed = ParsedJWT(
+        raw="",
+        header=header,
+        payload=payload,
+        signature=b"",
+        header_segment="",
+        payload_segment="",
+        signature_segment=str(signature_doc.get("raw") or ""),
+        metadata=JWTMetadata(
+            alg=_optional_meta(metadata_doc.get("alg")),
+            typ=_optional_meta(metadata_doc.get("typ")),
+            kid=_optional_meta(metadata_doc.get("kid")),
+            cty=_optional_meta(metadata_doc.get("cty")),
+            iss=_optional_meta(metadata_doc.get("iss")),
+            sub=_optional_meta(metadata_doc.get("sub")),
+            aud=metadata_doc.get("aud") if isinstance(metadata_doc.get("aud"), (str, list)) else None,
+            exp=_optional_number(metadata_doc.get("exp")),
+            iat=_optional_number(metadata_doc.get("iat")),
+            nbf=_optional_number(metadata_doc.get("nbf")),
+            jti=_optional_meta(metadata_doc.get("jti")),
+        ),
+        custom_claims=custom if isinstance(custom, dict) else {},
+    )
+    frozen = tuple(findings)
+    return AnalysisResult(token=parsed, findings=frozen, risk=risk_score(frozen))
+
+
+def _optional_meta(value: object) -> Optional[str]:
+    if value is None:
+        return None
+    return str(value)
+
+
+def _optional_number(value: object) -> Optional[float]:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return value
 
 
 def apply_severity_rules(
