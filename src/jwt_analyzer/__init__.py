@@ -5,9 +5,14 @@ from jwt_analyzer.analyzers import (
     CryptoAnalyzer,
     HeaderAnalysisConfig,
     HeaderAnalyzer,
+    JwksAnalysisConfig,
+    JwksAnalyzer,
+    OidcAnalysisConfig,
+    OidcTokenAnalyzer,
     PayloadAnalysisConfig,
     PayloadAnalyzer,
     SignatureStatus,
+    TokenRole,
 )
 from jwt_analyzer.exceptions import JWTParseError
 from jwt_analyzer.findings import Confidence, Finding, Severity
@@ -20,13 +25,18 @@ __all__ = [
     "Finding",
     "HeaderAnalysisConfig",
     "HeaderAnalyzer",
+    "JwksAnalysisConfig",
+    "JwksAnalyzer",
     "JWTParseError",
     "JWTMetadata",
     "JWTParser",
+    "OidcAnalysisConfig",
+    "OidcTokenAnalyzer",
     "ParsedJWT",
     "PayloadAnalysisConfig",
     "PayloadAnalyzer",
     "Severity",
+    "TokenRole",
     "SignatureStatus",
     "parse_jwt",
 ]

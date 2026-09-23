@@ -5,12 +5,15 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "jwt-analyzer"
 version = "0.1.0"
-description = "JWT Security Analyzer CLI — parser, header, payload, and signature analysis"
+description = "JWT Security Analyzer CLI — parser, header, payload, signature, JWKS, and OIDC analysis"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
     "cryptography>=42",
 ]
+
+[project.scripts]
+jwt-analyzer = "jwt_analyzer.main:main"
 
 [project.optional-dependencies]
 dev = [
