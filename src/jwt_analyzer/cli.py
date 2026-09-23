@@ -1,4 +1,4 @@
-"""Command-line facade for JWKS, OIDC, comparison, and batch analysis.
+"""Command-line facade for analysis, JWKS, OIDC, comparison, and batch.
 
 ``jwt-analyzer jwks`` prints key metadata and suspicious-key findings.
 ``jwt-analyzer oidc`` prints OpenID Provider metadata and advertised
@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Optional, Sequence, TextIO
 
 from jwt_analyzer.analyzers.batch import analyze_batch, format_batch_report, format_progress, load_token_source
+from jwt_analyzer.engine import AnalyzerEngine
 from jwt_analyzer.analyzers.compare import compare_tokens, format_comparison
 from jwt_analyzer.analyzers.jwks import format_jwks_analysis, load_jwks, match_token
 from jwt_analyzer.analyzers.oidc import (
@@ -31,6 +32,7 @@ from jwt_analyzer.exceptions import (
     JwksError,
     OidcError,
     RemoteFetchError,
+    ReporterError,
 )
 from jwt_analyzer.findings import Finding, Severity
 from jwt_analyzer.parser import parse_jwt
@@ -43,6 +45,20 @@ def build_parser() -> argparse.ArgumentParser:
         description="Analyze JWTs, a JSON Web Key Set, or an OpenID Provider.",
     )
     commands = parser.add_subparsers(dest="command", required=True)
+
+    analyze = commands.add_parser("analyze", help="Analyze one JWT and report the findings")
+    analyze.add_argument("token", help="Compact JWT or a file that contains one")
+    analyze.add_argument(
+        "--format",
+        default="text",
+        choices=("text", "json", "html", "markdown", "csv"),
+        help="Report format. text is the console report",
+    )
+    analyze.add_argument("--json", action="store_true", help="Write the JSON report")
+    analyze.add_argument("--html", nargs="?", const="-", help="Write the HTML report, optionally to a path")
+    analyze.add_argument("--output", "-o", help="Write the report to this path instead of the console")
+    analyze.add_argument("--color", action="store_true", help="Color the text report")
+    analyze.add_argument("--no-color", action="store_true", help="Do not color the text report")
 
     jwks = commands.add_parser("jwks", help="Analyze a JWKS URL or a local JWKS file")
     jwks.add_argument("location", help="HTTPS URL or path of a JWKS document")
@@ -91,6 +107,8 @@ def run(
         return 2 if code is None else int(code)
 
     try:
+        if args.command == "analyze":
+            return _cmd_analyze(args, out, err)
         if args.command == "jwks":
             return _cmd_jwks(args.location, args.token, out)
         if args.command == "oidc":
@@ -101,11 +119,58 @@ def run(
             return _cmd_compare(args.tokens, args.color, args.no_color, out, err)
         if args.command == "batch":
             return _cmd_batch(args.path, args.file, args.workers, out, err)
-    except (JwksError, OidcError, RemoteFetchError, JWTParseError, CompareError, BatchError, OSError) as exc:
+    except (
+        JwksError,
+        OidcError,
+        RemoteFetchError,
+        JWTParseError,
+        CompareError,
+        BatchError,
+        ReporterError,
+        OSError,
+    ) as exc:
         print(str(exc), file=err)
         return 2
     print(f"Unknown command: {args.command}", file=err)
     return 2
+
+
+def _cmd_analyze(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
+    if args.color and args.no_color:
+        print("Pass only one of --color or --no-color.", file=err)
+        return 2
+    try:
+        fmt, output = _report_target(args)
+    except ReporterError as exc:
+        print(str(exc), file=err)
+        return 2
+    result = AnalyzerEngine().run(_read_token(args.token))
+    document = AnalyzerEngine().render(result, fmt, color=_use_color(out, args.color, args.no_color))
+    if output:
+        Path(output).write_text(document, encoding="utf-8")
+    else:
+        print(document, file=out)
+    failed = result.risk.critical > 0 or result.risk.high > 0
+    return _status(result.findings, failed=failed)
+
+
+def _report_target(args: argparse.Namespace) -> tuple[str, Optional[str]]:
+    selected: list[str] = []
+    if args.json:
+        selected.append("json")
+    if args.html is not None:
+        selected.append("html")
+    if args.format != "text":
+        selected.append(args.format)
+    if len(set(selected)) > 1:
+        raise ReporterError("Pass only one report format.", code="INVALID_FORMAT")
+    fmt = selected[0] if selected else "text"
+    output = args.output
+    if args.html not in (None, "-"):
+        if output and output != args.html:
+            raise ReporterError("Pass the HTML path once, either with --html or --output.", code="INVALID_FORMAT")
+        output = args.html
+    return fmt, output
 
 
 def _cmd_jwks(location: str, token: Optional[str], out: TextIO) -> int:

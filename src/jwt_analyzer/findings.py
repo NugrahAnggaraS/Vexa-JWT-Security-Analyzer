@@ -5,7 +5,8 @@ description, evidence, impact, remediation, and references.
 
 Severity uses the documented scale CRITICAL, HIGH, MEDIUM, LOW, and INFO.
 Header warnings such as a suspicious ``kid`` or an external ``jku`` are
-reported as MEDIUM. Confidence records how sure the static check is.
+reported as MEDIUM. Confidence uses HIGH, MEDIUM, and LOW. CERTAIN, FIRM,
+and TENTATIVE are the same three levels.
 """
 
 from __future__ import annotations
@@ -26,11 +27,18 @@ class Severity(str, Enum):
 
 
 class Confidence(str, Enum):
-    """How certain the analyzer is that the condition is present."""
+    """How certain the analyzer is that the condition is present.
+
+    HIGH, MEDIUM, and LOW are the stored scale. CERTAIN, FIRM, and TENTATIVE
+    name those same levels: certain is high, firm is medium, tentative is low.
+    """
 
     HIGH = "HIGH"
     MEDIUM = "MEDIUM"
     LOW = "LOW"
+    CERTAIN = "HIGH"
+    FIRM = "MEDIUM"
+    TENTATIVE = "LOW"
 
 
 @dataclass(frozen=True)
