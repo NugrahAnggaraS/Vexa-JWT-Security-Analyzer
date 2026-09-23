@@ -3,7 +3,8 @@
 ``analyze`` is fast mode and stays offline. ``assess`` is assessment mode
 and contacts an issuer the operator named. ``verify`` checks a signature
 with a local key or a JWKS document. Configuration from ``--config`` or
-``~/.jwt-analyzer.yaml`` supplies defaults, and explicit flags replace them.
+``~/.vexa.yaml`` supplies defaults, and explicit flags replace them.
+Run ``vexa -h`` for this help.
 """
 
 from __future__ import annotations
@@ -59,7 +60,7 @@ commands:
   jwks      Inspect a local or remote JSON Web Key Set
   oidc      Inspect OpenID Provider discovery metadata
   report    Render a saved JSON analysis as text, HTML, Markdown, or CSV
-  version   Print the jwt-analyzer version
+  version   Print the vexa version
 
 modes:
   fast         Offline checks only. This is the default for analyze.
@@ -85,12 +86,13 @@ exit status:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Return the parser for every jwt-analyzer command."""
+    """Return the parser for every vexa command."""
     parser = argparse.ArgumentParser(
-        prog="jwt-analyzer",
+        prog="vexa",
         description=(
-            "Analyze JSON Web Tokens offline, verify signatures, and write "
-            "text, JSON, or standalone HTML reports."
+            "Vexa analyzes JSON Web Tokens offline, verifies signatures, and "
+            "writes text, JSON, HTML, Markdown, or CSV reports. "
+            "Run vexa -h or vexa <command> -h."
         ),
         epilog=_EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -201,8 +203,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     commands.add_parser(
         "version",
-        help="Print the jwt-analyzer version",
-        description="Print the installed jwt-analyzer version and exit.",
+        help="Print the vexa version",
+        description="Print the installed vexa version and exit.",
     )
     return parser
 

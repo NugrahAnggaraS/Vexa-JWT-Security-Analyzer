@@ -159,9 +159,10 @@ class TestEngineIgnore:
 
 class TestCliConfig:
     def test_help_lists_commands_and_shared_flags(self, capsys: pytest.CaptureFixture[str]) -> None:
-        code = run(["--help"])
+        code = run(["-h"])
         text = capsys.readouterr().out
         assert code == 0
+        assert "usage: vexa" in text
         for name in ("decode", "analyze", "assess", "verify", "compare", "batch", "jwks", "oidc", "report", "version"):
             assert name in text
         assert "--ignore-rule" in text
