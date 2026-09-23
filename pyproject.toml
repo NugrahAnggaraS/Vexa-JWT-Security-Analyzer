@@ -18,6 +18,7 @@ jwt-analyzer = "jwt_analyzer.main:main"
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4",
+    "pytest-cov>=4.1",
 ]
 
 [tool.setuptools.packages.find]
@@ -27,3 +28,10 @@ where = ["src"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "-q"
+
+[tool.coverage.run]
+source = ["jwt_analyzer"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true

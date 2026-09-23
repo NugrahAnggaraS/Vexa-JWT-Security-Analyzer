@@ -22,6 +22,7 @@ from jwt_analyzer.exceptions import JWTParseError
 REGISTERED_CLAIMS = frozenset({"iss", "sub", "aud", "exp", "nbf", "iat", "jti"})
 JWS_SEGMENT_COUNT = 3
 JWE_SEGMENT_COUNT = 5
+MAX_TOKEN_CHARS = 1_048_576
 
 # RFC 7515 base64url alphabet (padding is omitted in compact serialization).
 _B64URL_RE = re.compile(r"^[A-Za-z0-9_-]*$")
@@ -150,6 +151,11 @@ class JWTParser:
         raw = token.strip()
         if not raw:
             raise JWTParseError("Token is empty", code="EMPTY_TOKEN")
+        if len(raw) > MAX_TOKEN_CHARS:
+            raise JWTParseError(
+                f"Token exceeds the maximum length of {MAX_TOKEN_CHARS} characters",
+                code="TOKEN_TOO_LARGE",
+            )
         return raw
 
     def _split_segments(self, token: str) -> tuple[str, str, str]:
@@ -216,6 +222,11 @@ def decode_json_object(raw: bytes, name: str) -> dict[str, Any]:
 
     try:
         data = json.loads(text)
+    except RecursionError as exc:
+        raise JWTParseError(
+            f"Invalid JSON in {name}: nesting is too deep",
+            code="INVALID_JSON",
+        ) from exc
     except json.JSONDecodeError as exc:
         raise JWTParseError(
             f"Invalid JSON in {name}: {exc.msg}",
