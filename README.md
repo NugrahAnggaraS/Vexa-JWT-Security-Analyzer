@@ -639,25 +639,45 @@ Only test systems and tokens for which you have authorization.
 
 ---
 
+# CI security gate
+
+Use `jwt-analyzer` in a pipeline. The process exits 1 when a finding meets the severity threshold, so the job fails.
+
+```bash
+jwt-analyzer analyze token.jwt \
+    --severity-threshold HIGH \
+    --format json \
+    --output report.json
+```
+
+Exit codes:
+
+```text
+0  no finding at or above the threshold
+1  a finding meets the threshold
+2  invalid input
+3  configuration error
+4  runtime error
+```
+
+`--ignore-rule JWT-EXP-001` suppresses one finding id. A YAML or JSON config file supplies defaults, and the flags above replace those defaults.
+
+GitHub Actions runs the unit tests, the integration tests, and the parser fuzz corpus on every pull request (`.github/workflows/test.yml`). Coverage must stay above 80 percent.
+
+---
+
 # Testing
 
-Run unit tests:
+From `vexa_cli`:
 
 ```bash
-pytest
+python -m pip install -e ".[dev]"
+python -m pytest
+python -m pytest tests/unit tests/integration --cov=jwt_analyzer --cov-report=term-missing --cov-fail-under=80
+python tests/fuzz/run_fuzz.py --seconds 300
 ```
 
-Run tests with coverage (requires `pytest-cov`):
-
-```bash
-pytest --cov=src
-```
-
-Run static analysis and linting:
-
-```bash
-ruff check .
-```
+The fuzz corpus in `tests/fuzz/corpus` holds malformed JWTs. The timed fuzzer mutates that corpus and checks that the parser, base64url decoder, JSON decoder, header analyzer, and claim analyzer do not crash.
 
 ---
 

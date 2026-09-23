@@ -8,7 +8,7 @@ import json
 import pytest
 
 from jwt_analyzer.exceptions import JWTParseError
-from jwt_analyzer.parser import JWTParser, parse_jwt
+from jwt_analyzer.parser import MAX_TOKEN_CHARS, JWTParser, decode_json_object, parse_jwt
 
 # jwt.io HS256 example (signature is not verified by the parser).
 JWT_IO_EXAMPLE = (
@@ -237,3 +237,29 @@ class TestMalformedTokens:
         with pytest.raises(JWTParseError) as exc:
             parse_jwt("a.b")
         assert str(exc.value) == "Expected 3 segments, found 2"
+
+
+class TestMalformedLimits:
+    def test_oversized_token_is_rejected(self) -> None:
+        with pytest.raises(JWTParseError, match="maximum length") as exc:
+            parse_jwt("a" * (MAX_TOKEN_CHARS + 1))
+        assert exc.value.code == "TOKEN_TOO_LARGE"
+
+    def test_deeply_nested_json_does_not_crash(self) -> None:
+        nested = b'{"a":' * 2000 + b"1" + b"}" * 2000
+        try:
+            parsed = decode_json_object(nested, "payload")
+        except JWTParseError as exc:
+            assert exc.code == "INVALID_JSON"
+        else:
+            assert isinstance(parsed, dict)
+
+    def test_recursion_error_becomes_a_parse_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        def boom(text: str) -> object:
+            del text
+            raise RecursionError("deep")
+
+        monkeypatch.setattr("jwt_analyzer.parser.json.loads", boom)
+        with pytest.raises(JWTParseError, match="nesting is too deep") as exc:
+            decode_json_object(b'{"a": 1}', "payload")
+        assert exc.value.code == "INVALID_JSON"
