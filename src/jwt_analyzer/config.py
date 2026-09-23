@@ -2,7 +2,7 @@
 
 The module keeps one ``Settings`` instance. ``configure`` replaces it, and
 ``get_settings`` returns that same object. CLI flags replace values loaded
-from ``--config`` or from ``~/.jwt-analyzer.yaml``.
+from ``--config`` or from ``~/.vexa.yaml``.
 """
 
 from __future__ import annotations
@@ -50,7 +50,14 @@ _SEVERITY_RANK = {
     Severity.HIGH: 3,
     Severity.CRITICAL: 4,
 }
-_HOME_NAMES = (".jwt-analyzer.yaml", ".jwt-analyzer.yml", ".jwt-analyzer.json")
+_HOME_NAMES = (
+    ".vexa.yaml",
+    ".vexa.yml",
+    ".vexa.json",
+    ".jwt-analyzer.yaml",
+    ".jwt-analyzer.yml",
+    ".jwt-analyzer.json",
+)
 _NUMBER_RE = re.compile(r"-?\d+")
 _FLOAT_RE = re.compile(r"-?\d+\.\d+")
 
@@ -88,7 +95,7 @@ def get_settings() -> Settings:
 
 
 def default_config_path(home: Optional[Path] = None) -> Optional[Path]:
-    """Return ``~/.jwt-analyzer.yaml`` or the JSON fallback when it exists."""
+    """Return ``~/.vexa.yaml`` when it exists, otherwise an older home config."""
     root = home if home is not None else Path.home()
     for name in _HOME_NAMES:
         candidate = root / name

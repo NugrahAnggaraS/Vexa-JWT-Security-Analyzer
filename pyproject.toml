@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "jwt-analyzer"
+name = "vexa"
 version = "0.1.0"
-description = "JWT Security Analyzer CLI — config, fast and assessment modes, ignore rules, and reports"
+description = "Vexa — JWT security analyzer. Run it with the vexa command."
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.scripts]
-jwt-analyzer = "jwt_analyzer.main:main"
+vexa = "jwt_analyzer.main:main"
 
 [project.optional-dependencies]
 dev = [

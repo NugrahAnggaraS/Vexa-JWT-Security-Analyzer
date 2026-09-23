@@ -16,7 +16,7 @@ from jwt_analyzer.exceptions import RemoteFetchError
 
 DEFAULT_TIMEOUT_SECONDS = 10.0
 DEFAULT_MAX_BYTES = 1_048_576
-_USER_AGENT = "jwt-analyzer"
+_USER_AGENT = "vexa"
 
 Fetcher = Callable[[str], bytes]
 

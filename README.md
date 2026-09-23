@@ -1,674 +1,343 @@
-![vexa](./images/vexa.png)
+[vexa](./images/vexa.png)
+# Vexa
 
-**Vexa** is a command-line JWT security analyzer designed for security assessment, penetration testing, and application security testing.
+**Vexa** is a command-line JWT security analyzer for authorized security assessment, penetration testing, and application security testing.
 
-It analyzes JWT structure, headers, claims, algorithms, signatures, token lifetime, sensitive data exposure, and other security-relevant configurations.
+It inspects JWT structure, headers, claims, algorithms, signatures, token lifetime, and sensitive claim names. It can also compare tokens, analyze many tokens at once, and inspect a JWKS document or OpenID Provider metadata when you name the target.
 
-> **Vexa is intended for authorized security testing, research, development, and educational purposes.**
+Use Vexa only on applications, APIs, tokens, keys, and infrastructure you own or are explicitly allowed to assess.
 
----
+## Run it
 
-## Features
-
-### JWT Analysis
-
-* JWT structure validation
-* Header decoding
-* Payload decoding
-* Signature inspection
-* Base64URL validation
-* JSON structure validation
-* Duplicate claim detection
-
-### Algorithm Security
-
-* Algorithm identification
-* `alg: none` detection
-* Symmetric/asymmetric algorithm analysis
-* Algorithm and key compatibility checks
-* Unsupported/deprecated algorithm detection
-
-### Claim Analysis
-
-Analyzes standard JWT claims:
-
-```text
-iss
-sub
-aud
-exp
-iat
-nbf
-jti
-```
-
-Also supports analysis of custom claims.
-
-Checks include:
-
-* Missing expiration
-* Invalid expiration
-* Expired tokens
-* Invalid timestamps
-* Excessive token lifetime
-* Inconsistent temporal claims
-* Suspicious custom claims
-
-### Sensitive Data Detection
-
-Detects potential sensitive information inside JWT payloads, including patterns related to:
-
-```text
-password
-secret
-token
-api_key
-private_key
-authorization
-credit_card
-```
-
-Sensitive values can be masked in reports.
-
-### Signature Verification
-
-Supports verification using user-provided keys or secrets.
-
-Example:
+After installation, the command is `vexa`.
 
 ```bash
-vexa verify token.jwt --public-key public.pem
-```
-
-Supported algorithms include:
-
-```text
-HS256
-HS384
-HS512
-
-RS256
-RS384
-RS512
-
-ES256
-ES384
-ES512
-```
-
-### Security Findings
-
-Vexa converts analysis results into structured findings containing:
-
-```text
-ID
-Title
-Severity
-Confidence
-Description
-Evidence
-Impact
-Remediation
-References
-```
-
-Severity levels:
-
-```text
-CRITICAL
-HIGH
-MEDIUM
-LOW
-INFO
-```
-
-### JWKS Analysis
-
-Analyze JSON Web Key Sets and match JWT keys using `kid`.
-
-```bash
-vexa jwks https://example.com/.well-known/jwks.json
-```
-
-Capabilities include:
-
-* `kid` matching
-* Key type analysis
-* Algorithm matching
-* Signature verification
-* Key configuration analysis
-* Key rotation analysis
-
-### OIDC Analysis
-
-Vexa can analyze OpenID Connect discovery metadata.
-
-```bash
-vexa oidc https://auth.example.com
-```
-
-It can inspect:
-
-```text
-issuer
-jwks_uri
-id_token_signing_alg_values_supported
-response_types_supported
-grant_types_supported
-scopes_supported
-claims_supported
-```
-
-### Token Comparison
-
-Compare two JWTs:
-
-```bash
-vexa compare token1.jwt token2.jwt
-```
-
-Useful for analyzing differences between:
-
-* User tokens
-* Admin tokens
-* Access tokens
-* Tokens generated before/after authentication changes
-
-### Batch Analysis
-
-Analyze multiple tokens:
-
-```bash
-vexa batch ./tokens/
-```
-
-### Reporting
-
-Supported output formats:
-
-```text
-Terminal
-JSON
-YAML
-Markdown
-HTML
-```
-
-Example:
-
-```bash
-vexa analyze token.jwt --json
-```
-
-or:
-
-```bash
-vexa analyze token.jwt --html report.html
-```
-
----
-
-# Installation
-
-## From Source
-
-Clone the repository:
-
-```bash
-git clone https://github.com/yourusername/vexa.git
-cd vexa
-```
-
-Set up a virtual environment (recommended):
-
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows use: venv\Scripts\activate
-```
-
-Install the package and its dependencies:
-
-```bash
-pip install -e .
-```
-
-Run:
-
-```bash
+vexa -h
 vexa --help
+vexa <command> -h
 ```
 
----
+`vexa -h` prints every command, the operating modes, the shared flags, and the exit codes.
 
-# Quick Start
-
-Analyze a JWT:
+Before the `vexa` script is on your `PATH`, the same interface is:
 
 ```bash
-vexa analyze token.jwt
+python -m jwt_analyzer -h
 ```
 
-Decode a JWT:
+## Install
+
+From the `vexa_cli` directory:
 
 ```bash
-vexa decode token.jwt
+python -m venv .venv
 ```
 
-Verify a JWT:
+Windows:
 
 ```bash
-vexa verify token.jwt --public-key public.pem
+.venv\Scripts\activate
+python -m pip install -e .
 ```
 
-Compare tokens:
+macOS and Linux:
 
 ```bash
-vexa compare token1.jwt token2.jwt
+source .venv/bin/activate
+python -m pip install -e .
 ```
 
-Analyze a JWKS endpoint:
+Requires Python 3.9 or newer. The runtime dependency is `cryptography`.
+
+Check the install:
 
 ```bash
-vexa jwks https://example.com/.well-known/jwks.json
+vexa -h
+vexa version
 ```
 
-Analyze an OIDC issuer:
-
-```bash
-vexa oidc https://auth.example.com
-```
-
-Generate JSON output:
-
-```bash
-vexa analyze token.jwt --json
-```
-
-Generate HTML report:
-
-```bash
-vexa analyze token.jwt --html report.html
-```
-
----
-
-# Example
-
-Running:
-
-```bash
-vexa analyze token.jwt
-```
-
-may produce:
-
-```text
-Vexa JWT Security Analyzer
-────────────────────────────────────────
-
-JWT Information
-────────────────────────────────────────
-Algorithm : RS256
-Type      : JWT
-Key ID    : key-01
-Issuer    : https://auth.example.com
-Subject   : user-123
-Audience  : api
-Lifetime  : 12 hours
-
-Security Findings
-────────────────────────────────────────
-
-[HIGH] JWT-EXP-001
-Missing Expiration Claim
-
-Confidence: HIGH
-
-[MEDIUM] JWT-LIFE-001
-Excessive Token Lifetime
-
-Confidence: HIGH
-
-[MEDIUM] JWT-SEC-002
-Potential Sensitive Data
-
-Confidence: MEDIUM
-
-[INFO] JWT-HDR-001
-External Key Configuration Detected
-
-Confidence: MEDIUM
-
-────────────────────────────────────────
-
-Total Findings : 4
-
-CRITICAL : 0
-HIGH     : 1
-MEDIUM   : 2
-LOW      : 0
-INFO     : 1
-
-Risk Score : 58/100
-```
-
----
-
-# CLI Commands
-
-Vexa uses a command-based CLI structure:
+## Commands
 
 ```text
 vexa
-├── decode
-├── analyze
-├── verify
-├── compare
-├── batch
-├── jwks
-├── oidc
-├── report
-└── version
+├── decode     Decode one JWT
+├── analyze    Offline analysis (fast mode)
+├── assess     Assessment mode: OIDC discovery and JWKS
+├── verify     Check a signature with a key, secret, or JWKS
+├── compare    Diff two or more JWTs
+├── batch      Analyze a directory or a line-oriented file
+├── jwks       Inspect a local or remote JSON Web Key Set
+├── oidc       Inspect OpenID Provider discovery metadata
+├── report     Render a saved JSON analysis in another format
+└── version    Print the installed version
 ```
 
-## Decode
+### Decode
 
-Decode JWT header and payload.
+Print the header, payload, and metadata. This does not score findings and does not use the network.
 
 ```bash
 vexa decode token.jwt
+vexa decode "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.sig"
 ```
 
-## Analyze
+A token argument may be a compact JWT or a file that contains one.
 
-Perform security analysis.
+### Analyze
+
+Fast mode. Header, claim, lifetime, and local structure checks stay offline.
 
 ```bash
 vexa analyze token.jwt
 ```
 
-Optional lifetime threshold:
+`fast` and `passive` are the same offline mode. `assessment` on this command contacts the issuer you name:
 
 ```bash
-vexa analyze token.jwt --max-lifetime 3600
+vexa analyze token.jwt --mode assessment --issuer https://auth.example.com
 ```
 
-## Verify
+### Assess
 
-Verify JWT signature.
+Assessment mode always expects a remote target. Pass `--issuer` or `--jwks-url`.
+
+```bash
+vexa assess token.jwt --issuer https://auth.example.com
+vexa assess token.jwt --jwks-url https://auth.example.com/.well-known/jwks.json
+```
+
+Vexa fetches OpenID Provider metadata when an issuer is given, loads the advertised JWKS, and includes those checks in the report. It does not scan hosts you did not name.
+
+### Verify
+
+Pass exactly one key source.
 
 ```bash
 vexa verify token.jwt --public-key public.pem
+vexa verify token.jwt --secret "hmac-secret"
+vexa verify token.jwt --jwks-file jwks.json
+vexa verify token.jwt --jwks-url https://auth.example.com/.well-known/jwks.json
 ```
 
-For HMAC:
+`--public-key` is a PEM public key or certificate file. `--secret` is the HMAC secret itself, not a path. JWKS selection uses the token `kid`.
 
-```bash
-vexa verify token.jwt --secret secret.txt
+Supported signature algorithms:
+
+```text
+HS256  HS384  HS512
+RS256  RS384  RS512
+ES256  ES384  ES512
 ```
 
-## Compare
+`alg: none` is reported as a finding and is not treated as a successful verification.
 
-Compare two tokens:
+### Compare
 
 ```bash
 vexa compare token1.jwt token2.jwt
+vexa compare baseline.jwt later.jwt --no-color
 ```
 
-## Batch
+The report shows claim and header differences, including privilege-related changes such as role, scope, and audience.
 
-Analyze multiple tokens:
+### Batch
 
 ```bash
-vexa batch ./tokens/
+vexa batch ./tokens
+vexa batch --file tokens.txt
+vexa batch ./tokens --workers 4
 ```
 
-## JWKS
+A directory is read as one token per file. `--file` is a text file with one JWT per line. Pass a path or `--file`, not both.
 
-Analyze a JWKS endpoint:
+### JWKS
 
 ```bash
+vexa jwks ./jwks.json
 vexa jwks https://example.com/.well-known/jwks.json
+vexa jwks https://example.com/.well-known/jwks.json --token token.jwt
 ```
 
-## OIDC
+The report includes key type, use, algorithm, and `kid`. `--token` matches the JWT to a key and checks the signature when the key type allows it.
 
-Analyze an OIDC issuer:
+### OIDC
 
 ```bash
 vexa oidc https://auth.example.com
+vexa oidc https://auth.example.com --token token.jwt
 ```
 
-## Report
+Vexa reads `/.well-known/openid-configuration` and reports fields such as `issuer`, `jwks_uri`, signing algorithms, response types, grant types, scopes, and claims. `--token` compares the JWT `iss` and `alg` with that document.
 
-Generate a report:
+### Report
+
+`analyze` and `assess` can write JSON. `report` renders that file again.
 
 ```bash
-vexa report result.json --format html
+vexa analyze token.jwt --json -o result.json
+vexa report result.json --format html -o report.html
+vexa report result.json --format markdown
+vexa report result.json --format csv
+vexa report result.json --format text
 ```
 
----
+## Reports
 
-# Architecture
-
-Vexa follows a modular architecture:
-
-```text
-                    ┌───────────────┐
-                    │      CLI      │
-                    └───────┬───────┘
-                            │
-                            ▼
-                    ┌───────────────┐
-                    │ Command Layer │
-                    └───────┬───────┘
-                            │
-                            ▼
-                    ┌───────────────┐
-                    │ Input Manager │
-                    └───────┬───────┘
-                            │
-                            ▼
-                    ┌───────────────┐
-                    │  JWT Parser   │
-                    └───────┬───────┘
-                            │
-             ┌──────────────┼──────────────┐
-             │              │              │
-             ▼              ▼              ▼
-       ┌──────────┐   ┌───────────┐   ┌──────────┐
-       │Validator │   │ Analyzer  │   │ Verifier │
-       └────┬─────┘   └─────┬─────┘   └────┬─────┘
-            │               │              │
-            └───────────────┼──────────────┘
-                            ▼
-                    ┌───────────────┐
-                    │Finding Engine │
-                    └───────┬───────┘
-                            │
-                            ▼
-                    ┌───────────────┐
-                    │  Risk Scoring │
-                    └───────┬───────┘
-                            │
-                            ▼
-                    ┌───────────────┐
-                    │   Reporter    │
-                    └───────┬───────┘
-                            │
-              ┌─────────────┼─────────────┐
-              ▼             ▼             ▼
-          Terminal         JSON          HTML
-```
-
----
-
-# Project Structure
-
-```text
-vexa/
-│
-├── src/
-│   └── vexa/
-│       ├── __init__.py
-│       ├── main.py
-│       ├── cli.py
-│       │
-│       ├── parser.py
-│       ├── decoder.py
-│       ├── validator.py
-│       │
-│       ├── analyzers/
-│       │   ├── __init__.py
-│       │   ├── algorithm.py
-│       │   ├── claims.py
-│       │   ├── expiration.py
-│       │   ├── headers.py
-│       │   ├── sensitive.py
-│       │   ├── structure.py
-│       │   └── duplicate.py
-│       │
-│       ├── verifier.py
-│       ├── jwks.py
-│       ├── oidc.py
-│       ├── engine.py       # Findings & Scoring
-│       │
-│       └── reporters/
-│           ├── __init__.py
-│           ├── terminal.py
-│           ├── json_rep.py
-│           ├── yaml_rep.py
-│           ├── markdown.py
-│           └── html.py
-│
-├── tests/
-│   ├── unit/
-│   ├── integration/
-│   └── fuzz/
-│
-├── examples/
-│
-├── docs/
-│
-├── pyproject.toml
-├── requirements.txt
-├── Makefile
-└── README.md
-```
-
----
-
-# Technology Stack
-
-| Component    | Technology       |
-| ------------ | ---------------- |
-| Language     | Python 3.9+      |
-| CLI          | Click / Typer    |
-| JWT          | PyJWT            |
-| HTTP         | requests / httpx |
-| Cryptography | cryptography     |
-| JSON         | json (built-in)  |
-| HTML         | Jinja2           |
-| Testing      | pytest           |
-| Fuzzing      | Atheris          |
-| Linter/Fmt   | Ruff / Black     |
-| CI/CD        | GitHub Actions   |
-| Container    | Docker           |
-
----
-
-# Security Model
-
-Vexa is designed around three operating modes.
-
-## Passive
-
-Performs local analysis only.
+`analyze` and `assess` accept one format:
 
 ```bash
 vexa analyze token.jwt
+vexa analyze token.jwt --json
+vexa analyze token.jwt --html report.html
+vexa analyze token.jwt --format markdown -o report.md
+vexa analyze token.jwt --format csv -o report.csv
+vexa analyze token.jwt --format json -o report.json
 ```
 
-No external request is required.
+| Format | How to select it |
+| --- | --- |
+| Text | Default. Also `--format text` or `--format terminal` |
+| JSON | `--json` or `--format json` |
+| HTML | `--html report.html` or `--format html -o report.html` |
+| Markdown | `--format markdown` |
+| CSV | `--format csv` |
 
-## Verify
+`--html` without a path prints the HTML document. `--color` and `--no-color` apply to the text report. A text report on a terminal is colored unless you pass `--no-color` or set `report.color: false`.
 
-Uses keys or secrets explicitly provided by the user.
+A text report includes token metadata, each finding (id, title, severity, confidence, description, evidence, impact, remediation), severity counts, and a risk score from 0 to 100.
 
-```bash
-vexa verify token.jwt --public-key public.pem
-```
+## What the analyzers check
 
-## Assessment
+Offline analysis covers:
 
-Performs explicitly requested remote configuration analysis.
+- Compact JWT structure, Base64url segments, and JSON objects
+- Header algorithm, type, `kid`, `jku`, `x5u`, and `jwk`
+- `alg: none` and other weak or mismatched algorithms
+- Registered claims: `iss`, `sub`, `aud`, `exp`, `iat`, `nbf`, `jti`
+- Missing, invalid, expired, or inconsistent timestamps
+- Token lifetime above `analysis.max_token_lifetime` (default 3600 seconds)
+- Duplicate claims
+- Claim names that look sensitive (`password`, `secret`, `token`, `api_key`, `private_key`, `authorization`, `credit_card`, and close variants). Values are masked in findings
 
-```bash
-vexa assess token.jwt \
-    --issuer https://auth.example.com
-```
+Assessment and the `jwks` / `oidc` commands add remote configuration checks only for the URL you pass: discovery metadata, advertised algorithms, key metadata, `kid` matching, and signature verification.
 
-Remote analysis can include:
+Each finding has an id, title, severity (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, `INFO`), confidence, description, evidence, impact, and remediation.
 
-* OIDC discovery
-* JWKS discovery
-* Key matching
-* Configuration analysis
-* Signature verification
+## Configuration
 
----
-
-# Security Considerations
-
-Vexa is designed primarily for **analysis and verification**, not automated exploitation.
-
-The tool should:
-
-* Avoid credential attacks against remote services.
-* Avoid brute-force attacks against authentication endpoints.
-* Require explicit input for remote assessment.
-* Restrict remote URL access where appropriate.
-* Prevent unsafe SSRF behavior when processing `jku` or `x5u`.
-* Mask secrets in reports when possible.
-* Apply HTTP timeouts.
-* Validate redirects.
-* Handle malformed JWTs safely.
-* Avoid leaking sensitive token contents through logs.
-
-Only test systems and tokens for which you have authorization.
-
----
-
-# CI security gate
-
-Use `jwt-analyzer` in a pipeline. The process exits 1 when a finding meets the severity threshold, so the job fails.
-
-```bash
-jwt-analyzer analyze token.jwt \
-    --severity-threshold HIGH \
-    --format json \
-    --output report.json
-```
-
-Exit codes:
+Flags override the file. If you omit `--config`, Vexa loads the first file that exists:
 
 ```text
-0  no finding at or above the threshold
-1  a finding meets the threshold
-2  invalid input
-3  configuration error
-4  runtime error
+~/.vexa.yaml
+~/.vexa.yml
+~/.vexa.json
 ```
 
-`--ignore-rule JWT-EXP-001` suppresses one finding id. A YAML or JSON config file supplies defaults, and the flags above replace those defaults.
+Older `~/.jwt-analyzer.yaml`, `~/.jwt-analyzer.yml`, and `~/.jwt-analyzer.json` files are still read when no `.vexa.*` file is present.
 
-GitHub Actions runs the unit tests, the integration tests, and the parser fuzz corpus on every pull request (`.github/workflows/test.yml`). Coverage must stay above 80 percent.
+```yaml
+mode: fast
+issuer: https://auth.example.com
+log_level: WARNING
+analysis:
+  max_token_lifetime: 3600
+  check_sensitive_claims: true
+  check_duplicate_claims: true
+security:
+  severity_threshold: HIGH
+report:
+  format: text
+  color: true
+ignore:
+  - JWT-EXP-001
+```
 
----
+`mode` is `fast`, `passive`, or `assessment`. `passive` is stored as fast mode. `report.format` may be `text`, `terminal`, `json`, `html`, `markdown`, or `csv`.
 
-# Testing
+```bash
+vexa analyze token.jwt --config ./vexa.yaml --severity-threshold HIGH --ignore-rule JWT-EXP-001
+```
 
-From `vexa_cli`:
+There is no `--max-lifetime` flag. Set the lifetime limit with `analysis.max_token_lifetime` in the config file.
+
+## Shared flags
+
+Place these after the command name.
+
+| Flag | Effect |
+| --- | --- |
+| `--config PATH` | YAML or JSON defaults. Later flags replace the file |
+| `--ignore ID` | Suppress one finding id |
+| `--ignore-rule ID` | Same as `--ignore` |
+| `--severity-threshold LEVEL` | `analyze` and `assess` exit 1 at this severity or above. Default: `HIGH` |
+| `--verbose` | Log progress to stderr |
+| `--debug` | Log debug details to stderr |
+| `--log-level LEVEL` | `ERROR`, `WARN`, `INFO`, `DEBUG`, or `TRACE` |
+
+## Exit codes
+
+| Code | Meaning |
+| ---: | --- |
+| 0 | No finding at or above the severity threshold |
+| 1 | A finding meets the threshold, or signature verification failed |
+| 2 | Invalid input |
+| 3 | Configuration error |
+| 4 | Runtime error |
+
+Example CI check:
+
+```bash
+vexa analyze token.jwt --severity-threshold HIGH --format json -o report.json
+```
+
+Exit code 1 fails the job when a finding is `HIGH` or `CRITICAL`.
+
+## Modes
+
+**Fast / passive.** `vexa analyze` does not contact the network.
+
+**Verify.** Signature checks use only the key, secret, or JWKS you pass.
+
+**Assessment.** `vexa assess`, `vexa jwks <url>`, and `vexa oidc <issuer>` fetch only the URL you provide. Redirects stay on HTTP(S), credentials in the URL are rejected, the response body is size-capped, and the client times out.
+
+## Project layout
+
+```text
+vexa_cli/
+├── pyproject.toml          # installs the vexa command
+├── src/jwt_analyzer/
+│   ├── main.py             # vexa entry point
+│   ├── cli.py              # commands and flags
+│   ├── parser.py
+│   ├── config.py
+│   ├── engine.py           # analyzer chain and risk score
+│   ├── findings.py
+│   ├── http_client.py
+│   ├── analyzers/
+│   │   ├── header.py
+│   │   ├── payload.py
+│   │   ├── crypto.py
+│   │   ├── jwks.py
+│   │   ├── oidc.py
+│   │   ├── compare.py
+│   │   └── batch.py
+│   └── reporters/
+│       ├── text_reporter.py
+│       ├── json_reporter.py
+│       ├── html_reporter.py
+│       ├── markdown_reporter.py
+│       └── csv_reporter.py
+└── tests/
+    ├── unit/
+    ├── integration/
+    └── fuzz/
+```
+
+The import package remains `jwt_analyzer`. The command you run is `vexa`.
+
+## Tests
+
+From `vexa_cli`, with the dev extra:
 
 ```bash
 python -m pip install -e ".[dev]"
@@ -677,190 +346,18 @@ python -m pytest tests/unit tests/integration --cov=jwt_analyzer --cov-report=te
 python tests/fuzz/run_fuzz.py --seconds 300
 ```
 
-The fuzz corpus in `tests/fuzz/corpus` holds malformed JWTs. The timed fuzzer mutates that corpus and checks that the parser, base64url decoder, JSON decoder, header analyzer, and claim analyzer do not crash.
+GitHub Actions (`.github/workflows/test.yml`) runs the unit tests, integration tests, and parser fuzz corpus. Coverage must stay above 80 percent.
 
----
+## Stack
 
-# Development
+| Piece | Choice |
+| --- | --- |
+| Language | Python 3.9+ |
+| CLI | argparse (`vexa`, `vexa -h`) |
+| Signatures | cryptography |
+| Remote fetch | Python `urllib`, only for a URL you pass |
+| Tests | pytest |
 
-Format code:
+## Disclaimer
 
-```bash
-black .
-# or
-ruff format .
-```
-
-Run locally during development:
-
-```bash
-python -m src.vexa.main --help
-```
-
-Build or install locally:
-
-```bash
-pip install -e .
-```
-
----
-
-# Roadmap
-
-## v0.1 — MVP
-
-* [ ] CLI foundation
-* [ ] JWT parser
-* [ ] JWT decoder
-* [ ] Structure validation
-* [ ] Header analysis
-* [ ] Claim analysis
-* [ ] Algorithm analysis
-* [ ] Expiration analysis
-* [ ] Sensitive data detection
-* [ ] Signature verification
-* [ ] Severity classification
-* [ ] Confidence classification
-* [ ] Terminal output
-* [ ] JSON output
-
-## v0.2
-
-* [ ] Weak-secret analysis
-* [ ] Batch analysis
-* [ ] Token comparison
-* [ ] HTML report
-* [ ] Markdown report
-* [ ] YAML output
-* [ ] Configuration file
-* [ ] Finding suppression
-* [ ] CI/CD integration
-
-## v0.3
-
-* [ ] JWKS analysis
-* [ ] OIDC discovery
-* [ ] OAuth/OIDC analysis
-* [ ] Key rotation analysis
-* [ ] Remote configuration analysis
-* [ ] Finding correlation
-
-## v1.0
-
-* [ ] Plugin architecture
-* [ ] SARIF output
-* [ ] Advanced reporting
-* [ ] CI/CD security gate
-* [ ] Extensive test coverage
-* [ ] Documentation
-* [ ] Stable CLI interface
-
----
-
-# Exit Codes
-
-Vexa uses predictable exit codes:
-
-| Code | Meaning                    |
-| ---: | -------------------------- |
-|  `0` | No security findings       |
-|  `1` | Security findings detected |
-|  `2` | Invalid input              |
-|  `3` | Configuration error        |
-|  `4` | Runtime error              |
-
-This allows Vexa to be integrated into CI/CD pipelines.
-
-Example:
-
-```bash
-vexa analyze token.jwt --severity-threshold HIGH
-```
-
----
-
-# Use Cases
-
-Vexa can be used for:
-
-### Penetration Testing
-
-Analyze JWT implementations during web/API security assessments.
-
-### API Security
-
-Inspect authentication tokens used by REST APIs.
-
-### Application Security
-
-Identify insecure JWT configuration during development.
-
-### Bug Bounty
-
-Perform authorized JWT analysis during vulnerability research.
-
-### DevSecOps
-
-Integrate JWT security checks into CI/CD pipelines.
-
-### Security Research
-
-Experiment with JWT, JWS, JWKS, OAuth, and OIDC security mechanisms.
-
-### Education
-
-Learn how JWT authentication and common security issues work.
-
----
-
-# Contributing
-
-Contributions are welcome.
-
-Before submitting a pull request:
-
-1. Create or update tests.
-2. Run `pytest`.
-3. Run `ruff check .` to ensure code is clean.
-4. Format the code using `black .` or `ruff format .`.
-5. Update documentation when behavior changes.
-6. Keep security-sensitive behavior explicit and documented.
-
----
-
-# Disclaimer
-
-Vexa is a security testing and research tool.
-
-Use it only against applications, APIs, JWTs, keys, and infrastructure that you own or have explicit authorization to assess.
-
-The maintainers are not responsible for unauthorized use or damage caused by the tool.
-
----
-
-# License
-
-This project is licensed under the MIT License.
-
-See [`LICENSE`](LICENSE) for details.
-
----
-
-# Project Status
-
-**Status:** 🚧 Active Development
-
-Vexa is currently under development. Features and CLI interfaces may change before the first stable release.
-
----
-
-## Name
-
-**Vexa** — JWT Security Analyzer
-
-```text
-Vexa
-JWT Security Analyzer
-────────────────────────────
-Analyze. Verify. Assess.
-```
+Vexa is an analysis and verification tool. It is not an exploit framework. Test only systems and tokens you are authorized to assess.
